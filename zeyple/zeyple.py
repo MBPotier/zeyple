@@ -64,12 +64,15 @@ class Zeyple:
     def __init__(self, config_fname='zeyple.conf'):
         self.config = self.load_configuration(config_fname)
 
-        log_file = self.config.get('zeyple', 'log_file')
-        logging.basicConfig(
-            filename=log_file, level=logging.DEBUG,
-            format='%(asctime)s %(process)s %(levelname)s %(message)s'
-        )
-        logging.info("Zeyple ready to encrypt outgoing emails")
+        if self.config.has_option('zeyple', 'log_file'):
+            log_file = self.config.get('zeyple', 'log_file')
+            logging.basicConfig(
+                filename=log_file, level=logging.DEBUG,
+                format='%(asctime)s %(process)s %(levelname)s %(message)s'
+            )
+            logging.info("Zeyple ready to encrypt outgoing emails")
+        else:
+            logging.disable()
 
     def load_configuration(self, filename):
         """Reads and parses the config file"""
