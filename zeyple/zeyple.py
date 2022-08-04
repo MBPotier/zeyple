@@ -283,6 +283,11 @@ class Zeyple:
         """Returns the GPG key for the given email address"""
         logging.info("Trying to encrypt for %s", email)
 
+        # Check if there is a keyalias set for the email
+        # and use the replacement email for retrieving keys if so 
+        if self.config.has_option('keyaliases', email):
+            email=self.config.get('keyaliases', email)
+
         # Explicit matching of email and uid.email necessary.
         # Otherwise gpg.keylist will return a list of keys
         # for searches like "n"

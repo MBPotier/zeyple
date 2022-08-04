@@ -9,3 +9,5 @@ home = /var/lib/zeyple/keys
 host = localhost
 port = 10026
 
+[keyaliases]
+mail@example.com = gpgkeyemail@example.com
