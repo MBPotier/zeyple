@@ -12,15 +12,13 @@ If you want to contribute, please:
 You will need the following development dependencies.
 
 * Packages:
-  * Debian/Ubuntu: `apt-get install libgpgme11-dev`
-  * Fedora: `yum install gpgme-devel python-devel python3-devel`
-* Python eggs: `pip install -r requirements_gpgme.txt`
+  * Arch Linux: `pacman -S python-gpgme`
+  * Debian/Ubuntu: `apt-get install python3-gpg`
+  * Fedora: `yum install python3-devel gpgme-devel`
 
 ## Testing
 
-`tox` will run [pytest](http://pytest.org/) under every supported version of Python thanks to [tox](https://bitbucket.org/hpk42/tox).
-
-To restrict the versions of Python tested by `tox`, you can use `tox -e py27,py34,pypy` for example.
+Run `python -m pytest` and see [.github/workflows/zeyple.yml](./.github/workflows/zeyple.yml) for the full testing workflow.
 
 ### Inspec
 

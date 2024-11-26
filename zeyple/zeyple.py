@@ -1,47 +1,18 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-import sys
-import os
-import logging
-import email
-import email.mime.multipart
-import email.mime.application
-import email.encoders
-import smtplib
+from configparser import ConfigParser
 import copy
+import email
+import email.encoders
+import email.mime.application
+import email.mime.multipart
+import gpg
+import logging
+import os
 import re
-from io import BytesIO
-
-try:
-    from configparser import SafeConfigParser  # Python 3
-except ImportError:
-    from ConfigParser import SafeConfigParser  # Python 2
-
-legacy_gpg = False
-try:
-    import gpg
-except ImportError:
-    import gpgme
-    legacy_gpg = True
-
-# Boiler plate to avoid dependency on six
-# BBB: Python 2.7 support
-PY3K = sys.version_info > (3, 0)
-
-
-def message_from_binary(message):
-    if PY3K:
-        return email.message_from_bytes(message)
-    else:
-        return email.message_from_string(message)
-
-
-def as_binary_string(email):
-    if PY3K:
-        return email.as_bytes()
-    else:
-        return email.as_string()
+import smtplib
+import sys
 
 
 def encode_string(string):
@@ -52,10 +23,10 @@ def encode_string(string):
 
 
 __title__ = 'Zeyple'
-__version__ = '1.2.2'
+__version__ = '2.0.0'
 __author__ = 'Cédric Félizard'
 __license__ = 'AGPLv3+'
-__copyright__ = 'Copyright 2012-2018 Cédric Félizard'
+__copyright__ = 'Copyright 2012-2024 Cédric Félizard'
 
 
 class Zeyple:
@@ -77,7 +48,7 @@ class Zeyple:
     def load_configuration(self, filename):
         """Reads and parses the config file"""
 
-        config = SafeConfigParser()
+        config = ConfigParser()
         config.read([
             os.path.join('/etc/', filename),
             filename,
@@ -88,11 +59,7 @@ class Zeyple:
 
     @property
     def gpg(self):
-        global legacy_gpg
-        if legacy_gpg:
-            protocol = gpgme.PROTOCOL_OpenPGP
-        else:
-            protocol = gpg.constants.PROTOCOL_OpenPGP
+        protocol = gpg.constants.PROTOCOL_OpenPGP
 
         if self.config.has_option('gpg', 'executable'):
             executable = self.config.get('gpg', 'executable')
@@ -101,10 +68,7 @@ class Zeyple:
 
         home_dir = self.config.get('gpg', 'home')
 
-        if legacy_gpg:
-            ctx = gpgme.Context()
-        else:
-            ctx = gpg.Context()
+        ctx = gpg.Context()
         ctx.set_engine_info(protocol, executable, home_dir)
         ctx.armor = True
 
@@ -114,7 +78,7 @@ class Zeyple:
         """Encrypts the message with recipient keys"""
         message_data = encode_string(message_data)
 
-        in_message = message_from_binary(message_data)
+        in_message = email.message_from_bytes(message_data)
         logging.info(
             "Processing outgoing message %s", in_message['Message-id'])
 
@@ -220,7 +184,7 @@ class Zeyple:
             # remove superfluous header
             del mixed['MIME-Version']
 
-            payload = as_binary_string(mixed)
+            payload = mixed.as_bytes()
 
         encrypted_payload = self._encrypt_payload(payload, [key_id])
 
@@ -246,7 +210,6 @@ class Zeyple:
 
     def _encrypt_payload(self, payload, key_ids):
         """Encrypts the payload with the given keys"""
-        global legacy_gpg
         payload = encode_string(payload)
 
         self.gpg.armor = True
@@ -255,32 +218,18 @@ class Zeyple:
 
         for key in recipient:
             if key.expired:
-                if legacy_gpg:
-                    raise gpgme.GpgmeError(
-                        "Key with user email %s "
-                        "is expired!".format(key.uids[0].email))
-                else:
-                    raise gpg.errors.GPGMEError(
-                        "Key with user email %s "
-                        "is expired!".format(key.uids[0].email))
+                raise gpg.errors.GPGMEError(
+                    "Key with user email %s "
+                    "is expired!".format(key.uids[0].email))
 
-        if legacy_gpg:
-            plaintext = BytesIO(payload)
-            ciphertext = BytesIO()
+        (ciphertext, encresult, signresult) = self.gpg.encrypt(
+            gpg.Data(string=payload),
+            recipients=recipient,
+            sign=False,
+            always_trust=True
+        )
 
-            self.gpg.encrypt(recipient, gpgme.ENCRYPT_ALWAYS_TRUST,
-                          plaintext, ciphertext)
-
-            return ciphertext.getvalue()
-        else:
-            (ciphertext, encresult, signresult) = self.gpg.encrypt(
-                gpg.Data(string=payload),
-                recipients=recipient,
-                sign=False,
-                always_trust=True
-            )
-
-            return ciphertext
+        return ciphertext
 
     def _user_key(self, email):
         """Returns the GPG key for the given email address"""
@@ -300,7 +249,7 @@ class Zeyple:
                     return key.subkeys[0].keyid
 
         # Strip sub addressing tag
-        submail = re.sub('(\+[^@]+)', '', email)
+        submail = re.sub('(\\+[^@]+)', '', email)
         if submail != email:
             return self._user_key(submail)
 
@@ -330,8 +279,7 @@ class Zeyple:
 if __name__ == '__main__':
     recipients = sys.argv[1:]
 
-    # BBB: Python 2.7 support
-    binary_stdin = sys.stdin.buffer if PY3K else sys.stdin
+    binary_stdin = sys.stdin.buffer
     message = binary_stdin.read()
 
     zeyple = Zeyple()
